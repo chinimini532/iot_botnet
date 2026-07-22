@@ -1,0 +1,31 @@
+# Data (too large / not for version control)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Model weights
+models/checkpoints/*
+!models/checkpoints/.gitkeep
+*.onnx
+*.pt
+*.pth
+
+# Results (regenerate, don't commit)
+results/figures/*
+results/logs/*
+results/metrics/*
+!results/figures/.gitkeep
+!results/logs/.gitkeep
+!results/metrics/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.egg-info/
+.env
+venv/
+
+# OS
+.DS_Store
