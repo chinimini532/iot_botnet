@@ -20,6 +20,7 @@ Usage:
     python src/training/train_classifier.py
 """
 
+import argparse
 import json
 import time
 from pathlib import Path
@@ -63,10 +64,12 @@ def evaluate(model, X_test, y_test, model_name: str, scaler=None) -> dict:
     }
 
 
-def main():
+def main(sample_per_class: int = None):
     print("Loading train/test splits ...")
-    X_train, y_train, _ = load_split(SPLITS_DIR / "bot_iot_train.csv")
-    X_test, y_test, _ = load_split(SPLITS_DIR / "bot_iot_test.csv")
+    if sample_per_class is not None:
+        print(f"*** SMOKE TEST MODE: subsampling to {sample_per_class} rows/class ***")
+    X_train, y_train, _ = load_split(SPLITS_DIR / "bot_iot_train.csv", sample_per_class)
+    X_test, y_test, _ = load_split(SPLITS_DIR / "bot_iot_test.csv", sample_per_class)
     print(f"  train: {X_train.shape}, test: {X_test.shape}")
 
     all_results = []
@@ -116,13 +119,24 @@ def main():
     print("=" * 60)
     print(summary.to_string(index=False))
 
-    out_path = RESULTS_DIR / "tier1_classifier_results.json"
+    out_name = "tier1_classifier_results" + ("_smoketest" if sample_per_class else "")
+    summary_name = "tier1_comparison_summary" + ("_smoketest" if sample_per_class else "")
+
+    out_path = RESULTS_DIR / f"{out_name}.json"
     with open(out_path, "w") as f:
         json.dump(all_results, f, indent=2)
-    summary.to_csv(RESULTS_DIR / "tier1_comparison_summary.csv", index=False)
+    summary.to_csv(RESULTS_DIR / f"{summary_name}.csv", index=False)
     print(f"\nFull results saved to {out_path}")
-    print(f"Summary table saved to {RESULTS_DIR / 'tier1_comparison_summary.csv'}")
+    print(f"Summary table saved to {RESULTS_DIR / f'{summary_name}.csv'}")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--sample-per-class", type=int, default=None,
+        help="Smoke-test mode: subsample up to N rows per class for a fast "
+             "local run (e.g. --sample-per-class 2000). Omit for the full "
+             "real run on Kaggle.",
+    )
+    args = parser.parse_args()
+    main(sample_per_class=args.sample_per_class)

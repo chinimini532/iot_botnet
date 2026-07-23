@@ -41,8 +41,21 @@ MODELS_DIR = Path("models/checkpoints")
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def load_split(path: Path):
+def load_split(path: Path, sample_per_class: int = None):
+    """
+    Load a split CSV. If sample_per_class is given, stratified-subsample
+    up to that many rows per category_grouped class (fewer if a class has
+    less than that available) -- for a fast local smoke test before the
+    full Kaggle run. Leave as None for the real, full-scale run.
+    """
     df = pd.read_csv(path)
+    if sample_per_class is not None:
+        df = (
+            df.groupby(TARGET_COL, group_keys=False)
+            .apply(lambda g: g.sample(n=min(len(g), sample_per_class), random_state=42))
+        )
+        print(f"  [smoke test] subsampled to {len(df):,} rows "
+              f"(up to {sample_per_class} per class)")
     X = df[CANONICAL_FEATURES].values
     y = df[TARGET_COL].values
     return X, y, df
