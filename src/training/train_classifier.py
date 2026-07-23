@@ -46,6 +46,10 @@ def evaluate(model, X_test, y_test, model_name: str, scaler=None) -> dict:
     X_eval = scaler.transform(X_test) if scaler is not None else X_test
     y_pred = model.predict(X_eval)
 
+    # XGBoost predicts encoded integers -- decode back to original string labels
+    if hasattr(model, "label_encoder_"):
+        y_pred = model.label_encoder_.inverse_transform(y_pred)
+
     report = classification_report(y_test, y_pred, output_dict=True)
     cm = confusion_matrix(y_test, y_pred).tolist()
     labels = sorted(set(y_test) | set(y_pred))

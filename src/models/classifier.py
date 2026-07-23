@@ -24,7 +24,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.utils.class_weight import compute_class_weight
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
@@ -69,6 +69,15 @@ def compute_sample_weights(y: np.ndarray) -> np.ndarray:
 
 
 def train_xgboost(X_train, y_train) -> XGBClassifier:
+    """
+    XGBoost's sklearn wrapper requires integer-encoded labels (unlike RF,
+    LightGBM, Decision Tree, Logistic Regression, Naive Bayes, which all
+    handle string labels fine). We encode here and stash the LabelEncoder
+    on the model itself (model.label_encoder_) so evaluate() can decode
+    predictions back to the original string labels for comparison.
+    """
+    label_encoder = LabelEncoder()
+    y_train_encoded = label_encoder.fit_transform(y_train)
     sample_weights = compute_sample_weights(y_train)
 
     model = XGBClassifier(
@@ -81,7 +90,8 @@ def train_xgboost(X_train, y_train) -> XGBClassifier:
         random_state=42,
         n_jobs=-1,
     )
-    model.fit(X_train, y_train, sample_weight=sample_weights)
+    model.fit(X_train, y_train_encoded, sample_weight=sample_weights)
+    model.label_encoder_ = label_encoder
     return model
 
 
