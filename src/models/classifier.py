@@ -98,7 +98,7 @@ def train_xgboost(X_train, y_train) -> XGBClassifier:
 def train_random_forest(X_train, y_train) -> RandomForestClassifier:
     model = RandomForestClassifier(
         n_estimators=200,
-        max_depth=None,
+        max_depth=25,  # capped -- unbounded depth risks very long training time at 2.5M+ rows
         class_weight="balanced",
         random_state=42,
         n_jobs=-1,
@@ -151,12 +151,12 @@ def train_naive_bayes(X_train, y_train) -> GaussianNB:
     return model
 
 
-def save_model(model, name: str):
-    path = MODELS_DIR / f"{name}.joblib"
+def save_model(model, name: str, suffix: str = ""):
+    path = MODELS_DIR / f"{name}{suffix}.joblib"
     joblib.dump(model, path)
     print(f"Saved model to {path}")
 
 
-def load_model(name: str):
-    path = MODELS_DIR / f"{name}.joblib"
+def load_model(name: str, suffix: str = ""):
+    path = MODELS_DIR / f"{name}{suffix}.joblib"
     return joblib.load(path)

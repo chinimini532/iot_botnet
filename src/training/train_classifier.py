@@ -77,6 +77,7 @@ def main(sample_per_class: int = None):
     print(f"  train: {X_train.shape}, test: {X_test.shape}")
 
     all_results = []
+    suffix = "_smoketest" if sample_per_class else ""
 
     # ── Tree-based models (primary + comparisons) ──────────────────────
     tree_models = [
@@ -90,7 +91,7 @@ def main(sample_per_class: int = None):
         t0 = time.time()
         model = train_fn(X_train, y_train)
         print(f"  done in {time.time() - t0:.1f}s")
-        save_model(model, save_name)
+        save_model(model, save_name, suffix=suffix)
         all_results.append(evaluate(model, X_test, y_test, name))
 
     # ── Logistic Regression (needs scaling) ─────────────────────────────
@@ -100,8 +101,8 @@ def main(sample_per_class: int = None):
     scaler.fit(X_train)
     lr_model = train_logistic_regression(X_train, y_train, scaler)
     print(f"  done in {time.time() - t0:.1f}s")
-    save_model(lr_model, "logistic_regression_baseline")
-    save_model(scaler, "feature_scaler")
+    save_model(lr_model, "logistic_regression_baseline", suffix=suffix)
+    save_model(scaler, "feature_scaler", suffix=suffix)
     all_results.append(evaluate(lr_model, X_test, y_test, "Logistic Regression", scaler=scaler))
 
     # ── Naive Bayes ──────────────────────────────────────────────────────
@@ -109,7 +110,7 @@ def main(sample_per_class: int = None):
     t0 = time.time()
     nb_model = train_naive_bayes(X_train, y_train)
     print(f"  done in {time.time() - t0:.1f}s")
-    save_model(nb_model, "naive_bayes_baseline")
+    save_model(nb_model, "naive_bayes_baseline", suffix=suffix)
     all_results.append(evaluate(nb_model, X_test, y_test, "Naive Bayes"))
 
     # ── Summary table ────────────────────────────────────────────────────
