@@ -68,16 +68,27 @@ def evaluate(model, X_test, y_test, model_name: str, scaler=None) -> dict:
     }
 
 
-def main(sample_per_class: int = None):
+def main(sample_per_class: int = None, tag: str = "", split_suffix: str = ""):
     print("Loading train/test splits ...")
     if sample_per_class is not None:
         print(f"*** SMOKE TEST MODE: subsampling to {sample_per_class} rows/class ***")
-    X_train, y_train, _ = load_split(SPLITS_DIR / "bot_iot_train.csv", sample_per_class)
-    X_test, y_test, _ = load_split(SPLITS_DIR / "bot_iot_test.csv", sample_per_class)
+
+    train_path = SPLITS_DIR / f"bot_iot_train{split_suffix}.csv"
+    test_path = SPLITS_DIR / f"bot_iot_test{split_suffix}.csv"
+    print(f"  Loading from: {train_path.name}, {test_path.name}")
+
+    X_train, y_train, _ = load_split(train_path, sample_per_class)
+    X_test, y_test, _ = load_split(test_path, sample_per_class)
     print(f"  train: {X_train.shape}, test: {X_test.shape}")
 
     all_results = []
-    suffix = "_smoketest" if sample_per_class else ""
+    tag_parts = []
+    if sample_per_class:
+        tag_parts.append("smoketest")
+    if tag:
+        tag_parts.append(tag)
+    suffix = ("_" + "_".join(tag_parts)) if tag_parts else ""
+    print(f"  Results/checkpoint suffix: '{suffix}'")
 
     # ── Tree-based models (primary + comparisons) ──────────────────────
     tree_models = [
@@ -124,8 +135,8 @@ def main(sample_per_class: int = None):
     print("=" * 60)
     print(summary.to_string(index=False))
 
-    out_name = "tier1_classifier_results" + ("_smoketest" if sample_per_class else "")
-    summary_name = "tier1_comparison_summary" + ("_smoketest" if sample_per_class else "")
+    out_name = "tier1_classifier_results" + suffix
+    summary_name = "tier1_comparison_summary" + suffix
 
     out_path = RESULTS_DIR / f"{out_name}.json"
     with open(out_path, "w") as f:
@@ -143,5 +154,19 @@ if __name__ == "__main__":
              "local run (e.g. --sample-per-class 2000). Omit for the full "
              "real run on Kaggle.",
     )
+    parser.add_argument(
+        "--tag", type=str, default="",
+        help="Extra tag appended to result/checkpoint filenames, e.g. "
+             "--tag dedup, so different runs (e.g. before/after a fix) "
+             "never overwrite each other.",
+    )
+    parser.add_argument(
+        "--split-suffix", type=str, default="",
+        help="Suffix of the split files to load, matching split_data.py's "
+             "--suffix. e.g. --split-suffix _dedup loads "
+             "bot_iot_train_dedup.csv instead of bot_iot_train.csv. "
+             "Leave empty to load the original (pre-dedup) splits.",
+    )
     args = parser.parse_args()
-    main(sample_per_class=args.sample_per_class)
+    main(sample_per_class=args.sample_per_class, tag=args.tag,
+         split_suffix=args.split_suffix)

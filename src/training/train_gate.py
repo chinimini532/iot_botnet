@@ -17,6 +17,7 @@ import joblib
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import DataLoader, TensorDataset
@@ -25,6 +26,24 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "models"))
 from classifier import load_split
 from mlp_gate import MCDropoutMLP
+
+
+class FocalLoss(nn.Module):
+    """
+    Focuses training on hard-to-classify examples (down-weights easy,
+    already-confident ones) -- may produce sharper, more informative
+    uncertainty estimates than plain weighted cross-entropy.
+    """
+    def __init__(self, alpha: torch.Tensor, gamma: float = 2.0):
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def forward(self, logits, targets):
+        ce_loss = F.cross_entropy(logits, targets, weight=self.alpha, reduction="none")
+        pt = torch.exp(-ce_loss)
+        focal_loss = ((1 - pt) ** self.gamma) * ce_loss
+        return focal_loss.mean()
 
 SPLITS_DIR = Path("data/processed/splits")
 MODELS_DIR = Path("models/checkpoints")
@@ -41,13 +60,16 @@ def prepare_tensors(X, y, scaler: StandardScaler, label_encoder: LabelEncoder):
     return X_t, y_t
 
 
-def main(sample_per_class: int = None, epochs: int = 20, batch_size: int = 512):
+def main(sample_per_class: int = None, epochs: int = 20, batch_size: int = 512,
+         split_suffix: str = "", tag: str = "", loss_fn: str = "ce", focal_gamma: float = 2.0):
     print(f"Using device: {DEVICE}")
     print("Loading training data ...")
     if sample_per_class is not None:
         print(f"*** SMOKE TEST MODE: subsampling to {sample_per_class} rows/class ***")
 
-    X_train, y_train, _ = load_split(SPLITS_DIR / "bot_iot_train.csv", sample_per_class)
+    train_path = SPLITS_DIR / f"bot_iot_train{split_suffix}.csv"
+    print(f"  Loading from: {train_path.name}")
+    X_train, y_train, _ = load_split(train_path, sample_per_class)
 
     scaler = StandardScaler().fit(X_train)
     label_encoder = LabelEncoder().fit(y_train)
@@ -69,7 +91,12 @@ def main(sample_per_class: int = None, epochs: int = 20, batch_size: int = 512):
 
     model = MCDropoutMLP(n_features=X_t.shape[1], n_classes=n_classes).to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    criterion = nn.CrossEntropyLoss(weight=class_weights_t)
+    if loss_fn == "focal":
+        criterion = FocalLoss(alpha=class_weights_t, gamma=focal_gamma)
+        print(f"  Using Focal Loss (gamma={focal_gamma})")
+    else:
+        criterion = nn.CrossEntropyLoss(weight=class_weights_t)
+        print("  Using weighted Cross-Entropy Loss")
 
     print(f"\nTraining MC Dropout MLP for {epochs} epochs ...")
     model.train()
@@ -100,12 +127,12 @@ def main(sample_per_class: int = None, epochs: int = 20, batch_size: int = 512):
 
     # Save model + preprocessing artifacts together -- all three are needed
     # at inference time and must stay in sync.
-    suffix = "_smoketest" if sample_per_class else ""
+    suffix = tag if tag else split_suffix
     checkpoint = {
         "model_state_dict": model.state_dict(),
         "n_features": X_t.shape[1],
         "n_classes": n_classes,
-        "hidden_dim": 64,
+        "hidden_dim": 128,
     }
     torch.save(checkpoint, MODELS_DIR / f"mc_dropout_mlp{suffix}.pt")
     joblib.dump(scaler, MODELS_DIR / f"mlp_feature_scaler{suffix}.joblib")
@@ -119,6 +146,16 @@ if __name__ == "__main__":
                          help="Smoke-test mode: subsample up to N rows per class.")
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--batch-size", type=int, default=512)
+    parser.add_argument("--split-suffix", type=str, default="",
+                         help="Which split files to load, e.g. --split-suffix _dedup")
+    parser.add_argument("--tag", type=str, default="",
+                         help="Override checkpoint filename suffix. If not given, "
+                              "defaults to --split-suffix's value.")
+    parser.add_argument("--loss", type=str, default="ce", choices=["ce", "focal"],
+                         help="Loss function: 'ce' (weighted cross-entropy, default) "
+                              "or 'focal' (focal loss, focuses on hard examples).")
+    parser.add_argument("--focal-gamma", type=float, default=2.0)
     args = parser.parse_args()
     main(sample_per_class=args.sample_per_class, epochs=args.epochs,
-         batch_size=args.batch_size)
+         batch_size=args.batch_size, split_suffix=args.split_suffix, tag=args.tag,
+         loss_fn=args.loss, focal_gamma=args.focal_gamma)

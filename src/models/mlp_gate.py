@@ -18,25 +18,29 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 N_FEATURES = 9
-DROPOUT_RATE = 0.3
+DROPOUT_RATE = 0.2
 
 
 class MCDropoutMLP(nn.Module):
     def __init__(self, n_features: int = N_FEATURES, n_classes: int = 4,
-                 hidden_dim: int = 64, dropout_rate: float = DROPOUT_RATE):
+                 hidden_dim: int = 128, dropout_rate: float = DROPOUT_RATE):
         super().__init__()
         self.fc1 = nn.Linear(n_features, hidden_dim)
         self.drop1 = nn.Dropout(dropout_rate)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.drop2 = nn.Dropout(dropout_rate)
-        self.fc3 = nn.Linear(hidden_dim, n_classes)
+        self.fc3 = nn.Linear(hidden_dim, hidden_dim // 2)
+        self.drop3 = nn.Dropout(dropout_rate)
+        self.fc4 = nn.Linear(hidden_dim // 2, n_classes)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = self.drop1(x)
         x = F.relu(self.fc2(x))
         x = self.drop2(x)
-        return self.fc3(x)  # raw logits -- softmax applied outside
+        x = F.relu(self.fc3(x))
+        x = self.drop3(x)
+        return self.fc4(x)  # raw logits -- softmax applied outside
 
 
 def enable_mc_dropout(model: nn.Module):
