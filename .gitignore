@@ -1,3 +1,6 @@
+# Paper drafts / LaTeX build artifacts (not code)
+paper/
+
 # Data (too large / not for version control)
 data/raw/*
 data/processed/*
