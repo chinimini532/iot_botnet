@@ -1,0 +1,15 @@
+{
+  "xgb_tag": "dedup",
+  "mlp_tag": "dedup2",
+  "calib_tag": "dedup2",
+  "n_benchmark_samples": 2000,
+  "required_packages": {
+    "xgboost": "2.0.3",
+    "torch": "2.3.1",
+    "scikit-learn": "1.5.0",
+    "joblib": "1.4.2",
+    "pandas": "2.2.2",
+    "numpy": "1.26.4"
+  },
+  "instructions": "1. scp this entire deploy_package/ folder to the CM5. 2. On the CM5: pip install xgboost torch scikit-learn joblib pandas numpy (matching versions above where possible). 3. Copy cm5_benchmark.py alongside this folder. 4. Run: python cm5_benchmark.py"
+}
